@@ -81,6 +81,7 @@ def get_current_model_name() -> str:
         )
     return name
 
+
 def load_model_if_needed() -> tuple[str, Any]:
     name = get_current_model_name()
     if _model_cache["name"] == name and _model_cache["model"] is not None:
@@ -94,6 +95,7 @@ def load_model_if_needed() -> tuple[str, Any]:
     _model_cache["name"] = name
     _model_cache["model"] = model
     return name, model
+
 
 def log_prediction(payload: dict[str, Any]) -> None:
     LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -112,6 +114,7 @@ def health() -> dict[str, Any]:
     except Exception as exc:  # pragma: no cover
         return {"status": "error", "detail": str(exc)}
 
+
 @app.post("/predict")
 def predict(req: PredictRequest) -> dict[str, Any]:
     try:
@@ -119,8 +122,15 @@ def predict(req: PredictRequest) -> dict[str, Any]:
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+    # -------------------------------------------------------------------
     # Gestion automatique du request_id
-    request_id = req.request_id or str(uuid.uuid4())
+    # -------------------------------------------------------------------
+    if req.request_id:
+        request_id = req.request_id
+        request_id_source = "client"
+    else:
+        request_id = str(uuid.uuid4())
+        request_id_source = "generated"
 
     # Normalisation minimale côté API
     features = {
@@ -142,10 +152,12 @@ def predict(req: PredictRequest) -> dict[str, Any]:
             status_code=400,
             detail=f"Erreur de prédiction : {exc}",
         ) from exc
+
     latency_ms = (time.perf_counter() - start) * 1000.0
 
     out: dict[str, Any] = {
         "request_id": request_id,
+        "request_id_source": request_id_source,
         "model_version": model_name,
         "prediction": pred,
         "probability": round(proba, 6),
@@ -156,4 +168,3 @@ def predict(req: PredictRequest) -> dict[str, Any]:
 
     log_prediction(out)
     return out
-"# BAD CHANGE" 
